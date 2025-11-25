@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IDV Assignment 4: Interactive Heatmap</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f8f9fa;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        h1 { color: #2c3e50; margin-bottom: 5px; }
+        h3 { color: #7f8c8d; margin-top: 0; font-weight: 400; }
+        
+        .controls {
+            background: #ffffff;
+            padding: 15px 25px;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        /* Button Styling */
+        button {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            font-size: 14px;
+            font-weight: 600;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+
+        button:hover { background-color: #2980b9; transform: translateY(-1px); box-shadow: 0 4px 6px rgba(0,0,0,0.15); }
+        button:active { transform: translateY(1px); box-shadow: 0 1px 2px rgba(0,0,0,0.1); }
+        
+        .slider-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 14px;
+            color: #555;
+            background: #eee;
+            padding: 5px 15px;
+            border-radius: 20px;
+        }
+
+        input[type=range] { width: 120px; cursor: pointer; }
+
+        #chart-container {
+            background: white;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            border-radius: 8px;
+            padding: 20px;
+            position: relative;
+        }
+
+        .tooltip {
+            position: absolute;
+            text-align: center;
+            padding: 10px;
+            font-size: 13px;
+            background: rgba(30, 30, 30, 0.9);
+            color: #fff;
+            border-radius: 5px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.1s;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+
+        .axis text { font-size: 11px; fill: #555; }
+        .axis path, .axis line { display: none; }
+        
+        /* Highlight classes */
+        .axis text.active {
+            font-weight: bold;
+            fill: #d32f2f;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Model Robustness Heatmap</h1>
+    <h3>Data Option 2: Performance of 9 Approaches vs 26 Attacks</h3>
+
+    <div class="controls">
+        <!-- Note: Removed onclick attributes, using IDs instead -->
+        <span style="font-weight:bold;">Sort By:</span>
+        <button id="btn-orig">Default Order</button>
+        <button id="btn-best-model">Best Models (Cols)</button>
+        <button id="btn-hard-attack">Hardest Attacks (Rows)</button>
+
+        <div class="slider-container">
+            <span>Min Score: <strong id="slider-val">0</strong></span>
+            <input type="range" id="filterSlider" min="0" max="100" value="0" step="1">
+        </div>
+    </div>
+    
+    <div id="chart-container"></div>
+    <div id="tooltip" class="tooltip"></div>
+
+    <script>
+        // --- 1. DATA PREPARATION ---
+        const rawData = [
+            {Attack: "No Attack", ERM: 94.85, DA: 94.21, PGDT: 84.38, TRADES: 80.42, MART: 81.54, RS: 89.45, IBP: 48.40, PRL: 93.82, TandT: 94.23},
+            {Attack: "TIFGSM", ERM: 35.10, DA: 33.00, PGDT: 65.70, TRADES: 62.90, MART: 69.10, RS: 45.40, IBP: 40.20, PRL: 34.00, TandT: 92.80},
+            {Attack: "MIFGSM", ERM: 0.00, DA: 0.00, PGDT: 50.90, TRADES: 51.90, MART: 50.50, RS: 5.80, IBP: 38.10, PRL: 0.00, TandT: 92.80},
+            {Attack: "DIFGSM", ERM: 1.00, DA: 0.00, PGDT: 51.75, TRADES: 50.50, MART: 53.60, RS: 4.10, IBP: 38.10, PRL: 3.10, TandT: 92.80},
+            {Attack: "VMIFGSM", ERM: 0.00, DA: 0.00, PGDT: 51.10, TRADES: 50.90, MART: 51.90, RS: 4.10, IBP: 38.10, PRL: 0.00, TandT: 93.90},
+            {Attack: "TPGD", ERM: 38.10, DA: 39.20, PGDT: 69.30, TRADES: 69.10, MART: 70.10, RS: 48.50, IBP: 50.00, PRL: 28.90, TandT: 91.80},
+            {Attack: "FGSM", ERM: 29.90, DA: 25.80, PGDT: 57.95, TRADES: 54.60, MART: 61.90, RS: 28.90, IBP: 38.10, PRL: 25.80, TandT: 93.80},
+            {Attack: "RFGSM", ERM: 0.00, DA: 0.00, PGDT: 49.15, TRADES: 50.40, MART: 48.50, RS: 3.70, IBP: 38.10, PRL: 0.00, TandT: 90.00},
+            {Attack: "BIM", ERM: 0.00, DA: 0.00, PGDT: 52.00, TRADES: 57.20, MART: 47.40, RS: 2.10, IBP: 38.10, PRL: 0.00, TandT: 90.70},
+            {Attack: "FAB", ERM: 1.00, DA: 2.10, PGDT: 43.00, TRADES: 46.40, MART: 40.20, RS: 5.30, IBP: 38.10, PRL: 4.10, TandT: 90.10},
+            {Attack: "CW", ERM: 0.00, DA: 0.00, PGDT: 32.20, TRADES: 35.10, MART: 29.90, RS: 1.00, IBP: 40.20, PRL: 1.00, TandT: 92.90},
+            {Attack: "UPGD", ERM: 0.00, DA: 0.00, PGDT: 49.85, TRADES: 50.50, MART: 49.80, RS: 5.10, IBP: 38.10, PRL: 0.00, TandT: 93.80},
+            {Attack: "FFGSM", ERM: 19.60, DA: 23.70, PGDT: 60.55, TRADES: 55.70, MART: 66.00, RS: 33.00, IBP: 42.30, PRL: 29.90, TandT: 92.80},
+            {Attack: "Jitter", ERM: 11.30, DA: 12.40, PGDT: 48.15, TRADES: 47.40, MART: 49.50, RS: 34.00, IBP: 39.20, PRL: 24.70, TandT: 90.70},
+            {Attack: "PGD", ERM: 0.00, DA: 0.00, PGDT: 57.40, TRADES: 54.60, MART: 60.80, RS: 7.20, IBP: 40.20, PRL: 0.00, TandT: 91.80},
+            {Attack: "EOTPGD", ERM: 0.00, DA: 0.00, PGDT: 50.10, TRADES: 50.30, MART: 50.50, RS: 3.00, IBP: 38.10, PRL: 0.00, TandT: 90.70},
+            {Attack: "APGD", ERM: 0.00, DA: 0.00, PGDT: 48.40, TRADES: 51.00, MART: 46.40, RS: 1.00, IBP: 38.10, PRL: 0.00, TandT: 90.70},
+            {Attack: "NIFGSM", ERM: 0.00, DA: 0.00, PGDT: 57.95, TRADES: 56.70, MART: 59.80, RS: 7.20, IBP: 38.10, PRL: 1.00, TandT: 92.80},
+            {Attack: "SiniFGSM", ERM: 4.10, DA: 1.00, PGDT: 59.00, TRADES: 56.70, MART: 61.90, RS: 23.70, IBP: 38.10, PRL: 12.40, TandT: 93.70},
+            {Attack: "VNIFGSM", ERM: 0.00, DA: 0.00, PGDT: 50.45, TRADES: 53.00, MART: 48.50, RS: 5.10, IBP: 38.10, PRL: 0.00, TandT: 92.90},
+            {Attack: "APGDT", ERM: 0.00, DA: 0.00, PGDT: 40.90, TRADES: 44.30, MART: 38.10, RS: 0.00, IBP: 38.10, PRL: 0.00, TandT: 88.70},
+            {Attack: "Square", ERM: 0.00, DA: 1.00, PGDT: 50.40, TRADES: 54.00, MART: 47.40, RS: 3.10, IBP: 38.10, PRL: 2.10, TandT: 88.08},
+            {Attack: "Add G. Noise", ERM: 25.80, DA: 43.30, PGDT: 79.10, TRADES: 78.40, MART: 80.40, RS: 74.20, IBP: 42.30, PRL: 45.40, TandT: 87.60},
+            {Attack: "OnePixel", ERM: 79.40, DA: 83.50, PGDT: 78.05, TRADES: 74.20, MART: 82.50, RS: 83.50, IBP: 42.50, PRL: 80.40, TandT: 89.70},
+            {Attack: "Pixle", ERM: 0.00, DA: 0.00, PGDT: 12.55, TRADES: 11.30, MART: 14.40, RS: 1.00, IBP: 10.30, PRL: 0.00, TandT: 17.50},
+            {Attack: "PGDL2", ERM: 1.00, DA: 0.00, PGDT: 35.80, TRADES: 36.10, MART: 36.10, RS: 5.20, IBP: 36.10, PRL: 0.00, TandT: 92.90}
+        ];
+
+        const approaches = ["ERM", "DA", "PGDT", "TRADES", "MART", "RS", "IBP", "PRL", "TandT"];
+        const attacksOriginal = rawData.map(d => d.Attack);
+        
+        // Calculate stats for sorting
+        const modelStats = approaches.map(m => ({
+            name: m,
+            avg: d3.mean(rawData, d => d[m])
+        }));
+
+        const attackStats = rawData.map(d => {
+            const vals = approaches.map(a => d[a]);
+            return {
+                name: d.Attack,
+                avg: d3.mean(vals)
+            };
+        });
+
+        let longData = [];
+        rawData.forEach(row => {
+            approaches.forEach(approach => {
+                longData.push({
+                    attack: row.Attack,
+                    approach: approach,
+                    value: row[approach]
+                });
+            });
+        });
+
+        // --- 2. D3 SETUP ---
+        const margin = { top: 40, right: 60, bottom: 100, left: 120 };
+        const width = 850 - margin.left - margin.right;
+        const height = 700 - margin.top - margin.bottom;
+
+        const svg = d3.select("#chart-container")
+            .append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+            .attr("transform", `translate(${margin.left},${margin.top})`);
+
+        // Scales
+        const x = d3.scaleBand()
+            .range([0, width])
+            .domain(approaches)
+            .padding(0.05);
+
+        const y = d3.scaleBand()
+            .range([0, height])
+            .domain(attacksOriginal)
+            .padding(0.05);
+
+        const myColor = d3.scaleSequential()
+            .interpolator(d3.interpolateRdYlGn)
+            .domain([0, 100]);
+
+        // Axes Groups
+        const xAxisGroup = svg.append("g")
+            .attr("class", "x-axis")
+            .attr("transform", `translate(0, ${height})`);
+
+        const yAxisGroup = svg.append("g")
+            .attr("class", "y-axis");
+
+        // Function to render/update axes
+        function renderAxes(transition) {
+            let xG = transition ? xAxisGroup.transition(transition) : xAxisGroup;
+            let yG = transition ? yAxisGroup.transition(transition) : yAxisGroup;
+
+            xG.call(d3.axisBottom(x))
+              .selectAll("text")
+              .attr("class", "x-label")
+              .style("text-anchor", "end")
+              .attr("dx", "-.8em")
+              .attr("dy", ".15em")
+              .attr("transform", "rotate(-45)");
+
+            yG.call(d3.axisLeft(y))
+              .selectAll("text")
+              .attr("class", "y-label");
+        }
+
+        // Initial Axis Render
+        renderAxes();
+
+        // Labels
+        svg.append("text").attr("x", width / 2).attr("y", height + margin.bottom - 10)
+           .attr("text-anchor", "middle").style("font-weight", "bold").text("Defense Approaches (Models)");
+
+        svg.append("text").attr("transform", "rotate(-90)").attr("y", -margin.left + 20).attr("x", -height / 2)
+           .attr("dy", "1em").attr("text-anchor", "middle").style("font-weight", "bold").text("Attack Methods");
+
+        // --- 3. DRAW HEATMAP ---
+        // Use a group for rects to manage z-index if needed
+        const rectGroup = svg.append("g").attr("class", "rects");
+
+        const rects = rectGroup.selectAll("rect")
+            .data(longData, d => d.approach + "-" + d.attack)
+            .enter()
+            .append("rect")
+            .attr("x", d => x(d.approach))
+            .attr("y", d => y(d.attack))
+            .attr("width", x.bandwidth())
+            .attr("height", y.bandwidth())
+            .style("fill", d => myColor(d.value))
+            .style("opacity", 0); // Start hidden
+
+        // Intro Transition
+        rects.transition().duration(1000)
+            .delay((d, i) => i * 1.5)
+            .style("opacity", 1);
+
+        // --- 4. INTERACTION EVENTS (Tooltip) ---
+        const tooltip = d3.select("#tooltip");
+
+        rects.on("mouseover", function(event, d) {
+            if (d3.select(this).style("opacity") < 0.5) return; // Ignore faded items
+
+            d3.select(this).style("stroke", "#222").style("stroke-width", 2);
+            
+            tooltip.style("opacity", 1)
+                .html(`
+                    <div style="margin-bottom:4px;"><strong>${d.approach}</strong> vs <strong>${d.attack}</strong></div>
+                    <div style="font-size:15px;">Score: <span style='color:${myColor(d.value)}; font-weight:bold;'>${d.value.toFixed(2)}</span></div>
+                `)
+                .style("left", (event.pageX + 15) + "px")
+                .style("top", (event.pageY - 15) + "px");
+
+            // Bold Labels
+            svg.selectAll(".x-label").filter(t => t === d.approach).classed("active", true);
+            svg.selectAll(".y-label").filter(t => t === d.attack).classed("active", true);
+        })
+        .on("mousemove", function(event) {
+            tooltip.style("left", (event.pageX + 15) + "px").style("top", (event.pageY - 15) + "px");
+        })
+        .on("mouseleave", function() {
+            d3.select(this).style("stroke", "none");
+            tooltip.style("opacity", 0);
+            svg.selectAll(".x-label, .y-label").classed("active", false);
+        });
+
+        // --- 5. INTERACTION LOGIC (Sorting & Filtering) ---
+        
+        // Helper function to run the sort animation
+        function runSort() {
+            const t = svg.transition().duration(1000);
+
+            // 1. Move Rects
+            rects.transition(t)
+                .attr("x", d => x(d.approach))
+                .attr("y", d => y(d.attack));
+
+            // 2. Update Axes
+            renderAxes(t);
+        }
+
+        // Button Bindings using D3
+        d3.select("#btn-orig").on("click", () => {
+            console.log("Sorting: Original");
+            x.domain(approaches);
+            y.domain(attacksOriginal);
+            runSort();
+        });
+
+        d3.select("#btn-best-model").on("click", () => {
+            console.log("Sorting: Best Models");
+            // Sort approaches by Avg descending
+            const sortedModels = [...modelStats].sort((a,b) => b.avg - a.avg).map(d => d.name);
+            x.domain(sortedModels);
+            runSort();
+        });
+
+        d3.select("#btn-hard-attack").on("click", () => {
+            console.log("Sorting: Hardest Attacks");
+            // Sort attacks by Avg ascending (lower score = harder attack)
+            const sortedAttacks = [...attackStats].sort((a,b) => a.avg - b.avg).map(d => d.name);
+            y.domain(sortedAttacks);
+            runSort();
+        });
+
+        // Slider Binding
+        d3.select("#filterSlider").on("input", function() {
+            const val = +this.value;
+            d3.select("#slider-val").text(val);
+            
+            rects.transition().duration(200)
+                .style("opacity", d => d.value < val ? 0.1 : 1)
+                .style("filter", d => d.value < val ? "grayscale(100%)" : "none");
+        });
+
+        // --- 6. LEGEND ---
+        const legendHeight = 300;
+        const legendWidth = 15;
+        const defs = svg.append("defs");
+        
+        const linearGradient = defs.append("linearGradient").attr("id", "grad1");
+        linearGradient.attr("x1", "0%").attr("y1", "100%").attr("x2", "0%").attr("y2", "0%");
+        linearGradient.append("stop").attr("offset", "0%").attr("stop-color", myColor(0));
+        linearGradient.append("stop").attr("offset", "50%").attr("stop-color", myColor(50));
+        linearGradient.append("stop").attr("offset", "100%").attr("stop-color", myColor(100));
+
+        const legend = svg.append("g")
+            .attr("transform", `translate(${width + 20}, ${height/2 - legendHeight/2})`);
+
+        legend.append("rect")
+            .attr("width", legendWidth)
+            .attr("height", legendHeight)
+            .style("fill", "url(#grad1)");
+            
+        const yLegend = d3.scaleLinear().range([legendHeight, 0]).domain([0, 100]);
+        legend.append("g")
+            .attr("transform", `translate(${legendWidth}, 0)`)
+            .call(d3.axisRight(yLegend).ticks(5));
+            
+        legend.append("text").attr("x", 0).attr("y", -10).text("Score").style("font-size","12px");
+
+    </script>
+</body>
+</html>

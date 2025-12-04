@@ -3,376 +3,336 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>交互式SVG预览</title>
+    <title>assignment 3 - 图片网格展示</title>
     <style>
         * {
-            box-sizing: border-box;
             margin: 0;
             padding: 0;
+            box-sizing: border-box;
         }
+        
         body {
-            font-family: 'Segoe UI', Roboto, sans-serif;
-            background-color: #f8f9fa;
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background-color: #f5f7fa;
             color: #333;
             line-height: 1.6;
-        }
-        .header {
-            max-width: 1200px;
-            margin: 0 auto;
             padding: 20px;
+        }
+
+        /* 整体布局：居中 + 顶部说明 + 网格内容 */
+        .page {
+            max-width: 1100px;
+            margin: 0 auto;
+        }
+        
+        .container {
+            background-color: #fff;
+            border-radius: 16px;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.08);
+            padding: 28px 28px 32px;
+        }
+        
+        .page-header {
+            margin-bottom: 24px;
             display: flex;
             flex-wrap: wrap;
             justify-content: space-between;
-            align-items: center;
-            gap: 15px;
+            gap: 12px;
+            align-items: flex-end;
         }
+
         h1 {
             color: #2c3e50;
-            font-size: 1.8rem;
-        }
-        .controls {
-            display: flex;
-            gap: 10px;
-            align-items: center;
-        }
-        .search-box {
-            padding: 8px 12px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-            font-size: 0.9rem;
-            width: 220px;
-            transition: border-color 0.3s;
-        }
-        .search-box:focus {
-            outline: none;
-            border-color: #3498db;
-        }
-        .layout-buttons {
-            display: flex;
-            gap: 5px;
-        }
-        .layout-btn {
-            background: #fff;
-            border: 1px solid #ddd;
-            padding: 6px 10px;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        .layout-btn.active {
-            background: #3498db;
-            color: white;
-            border-color: #3498db;
-        }
-        .layout-btn:hover:not(.active) {
-            background: #f1f1f1;
+            font-weight: 650;
+            font-size: 24px;
         }
 
-        .preview-container {
+        .subtitle {
+            font-size: 14px;
+            color: #6c757d;
+        }
+
+        .tag-list {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            font-size: 12px;
+        }
+
+        .tag {
+            padding: 4px 10px;
+            border-radius: 999px;
+            background-color: #f1f3f5;
+            color: #495057;
+        }
+        
+        /* 改为网格布局 */
+        .image-list {
             display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-            gap: 20px;
-            padding: 0 20px 40px;
-            max-width: 1200px;
-            margin: 0 auto;
-            transition: all 0.3s ease;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 24px;
         }
-        .preview-container.list-view {
-            grid-template-columns: 1fr;
-        }
-
-        .svg-item {
-            border: 1px solid #ddd;
-            padding: 15px;
-            border-radius: 8px;
-            text-align: center;
-            background: white;
-            transition: all 0.3s ease;
-            cursor: pointer;
-            position: relative;
+        
+        .image-item {
+            border-radius: 14px;
             overflow: hidden;
-        }
-        .svg-item:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 8px 16px rgba(0,0,0,0.1);
-            border-color: #3498db;
-        }
-        .svg-item.list-view {
+            transition: transform 0.25s ease, box-shadow 0.25s ease, translate 0.25s ease;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.08);
+            background-color: #fff;
             display: flex;
-            align-items: center;
-            gap: 20px;
-            text-align: left;
-            padding: 15px 20px;
+            flex-direction: column;
+            height: 100%;
+        }
+        
+        .image-item:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.16);
+        }
+        
+        .image-link {
+            display: block;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        
+        .image-link img {
+            width: 100%;
+            height: 180px;
+            object-fit: cover;
+            display: block;
+        }
+        
+        .image-caption {
+            padding: 10px 12px 12px;
+            background-color: #f8f9fa;
+            font-size: 14px;
+            color: #495057;
+            text-align: center;
         }
 
-        .svg-name {
-            margin-bottom: 10px;
+        .image-caption span {
+            display: block;
+        }
+
+        .image-caption .title {
             font-weight: 600;
-            color: #2c3e50;
-            word-break: break-all;
-            transition: color 0.3s;
-        }
-        .svg-item:hover .svg-name {
-            color: #3498db;
-        }
-        .svg-item.list-view .svg-name {
-            margin-bottom: 0;
-            font-size: 1.1rem;
+            margin-bottom: 4px;
+            color: #343a40;
         }
 
-        .svg-preview {
-            max-width: 100%;
-            max-height: 200px;
-            border: 1px dashed #ccc;
-            margin: 0 auto;
-            transition: all 0.3s ease;
+        .image-caption .desc {
+            font-size: 12px;
+            color: #868e96;
         }
-        .svg-item:hover .svg-preview {
-            transform: scale(1.05);
-            border-color: #3498db;
-        }
-        .svg-item.list-view .svg-preview {
-            max-height: 100px;
-            margin: 0;
-            flex-shrink: 0;
-        }
-
-        .error-message {
-            color: #dc3545;
-            padding: 20px 0;
-            font-size: 0.9em;
-        }
-
-        /* 模态框样式 */
+        
+        /* 模态窗口样式 保持核心逻辑不变 */
         .modal {
+            display: none;
             position: fixed;
             top: 0;
             left: 0;
             width: 100%;
             height: 100%;
-            background: rgba(0,0,0,0.8);
-            display: flex;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
             justify-content: center;
             align-items: center;
-            z-index: 1000;
-            opacity: 0;
-            visibility: hidden;
-            transition: all 0.3s ease;
         }
-        .modal.active {
-            opacity: 1;
-            visibility: visible;
-        }
+        
         .modal-content {
-            background: white;
-            padding: 20px;
-            border-radius: 8px;
-            max-width: 90%;
-            max-height: 90%;
+            background-color: #fff;
+            width: 90%;
+            max-width: 900px;
+            height: 80%;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 5px 25px rgba(0, 0, 0, 0.3);
             display: flex;
             flex-direction: column;
-            align-items: center;
-            transform: scale(0.8);
-            transition: transform 0.3s ease;
         }
-        .modal.active .modal-content {
-            transform: scale(1);
-        }
-        .modal-svg {
-            max-width: 100%;
-            max-height: 70vh;
-        }
-        .modal-caption {
-            margin-top: 15px;
-            font-weight: 600;
-            color: #2c3e50;
-        }
-        .close-btn {
-            margin-top: 15px;
-            padding: 8px 16px;
-            background: #3498db;
+        
+        .modal-header {
+            padding: 15px 20px;
+            background-color: #2c3e50;
             color: white;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: background 0.2s;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
-        .close-btn:hover {
-            background: #2980b9;
+        
+        .modal-title {
+            font-size: 18px;
+            font-weight: 500;
+        }
+        
+        .close-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            line-height: 1;
+        }
+        
+        .modal-body {
+            flex: 1;
+            border: none;
+            width: 100%;
+        }
+        
+        @media (max-width: 768px) {
+            body {
+                padding: 12px;
+            }
+
+            .container {
+                padding: 20px;
+            }
+
+            .page-header {
+                gap: 8px;
+            }
+
+            h1 {
+                font-size: 20px;
+            }
+
+            .image-link img {
+                height: 160px;
+            }
         }
 
-        @media (max-width: 768px) {
-            .header {
-                flex-direction: column;
-                align-items: flex-start;
+        @media (max-width: 480px) {
+            .container {
+                padding: 16px;
             }
-            .controls {
-                width: 100%;
-                flex-wrap: wrap;
-            }
-            .search-box {
-                width: 100%;
-            }
-            .preview-container {
-                grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+
+            .image-link img {
+                height: 150px;
             }
         }
     </style>
 </head>
 <body>
-    <div class="header">
-        <h1>SVG文件预览</h1>
-        <div class="controls">
-            <input type="text" class="search-box" placeholder="搜索SVG文件名...">
-            <div class="layout-buttons">
-                <button class="layout-btn active" data-layout="grid">网格视图</button>
-                <button class="layout-btn" data-layout="list">列表视图</button>
+    <div class="page">
+        <div class="container">
+            <div class="page-header">
+                <div>
+                    <h1>assignment 3</h1>
+                    <p class="subtitle">点击任意作品缩略图，在弹出的窗口中预览完整页面。</p>
+                </div>
+                <div class="tag-list">
+                    <span class="tag">Gallery</span>
+                    <span class="tag">Responsive Grid</span>
+                    <span class="tag">Modal Preview</span>
+                </div>
+            </div>
+
+            <div class="image-list">
+                <!-- 图片1 -->
+                <div class="image-item">
+                    <a class="image-link" data-url="https://nowater0418.github.io/1/" data-title="页面1">
+                        <img src="https://raw.githubusercontent.com/nowater0418/image/main/1.jpg" alt="图片1">
+                    </a>
+                    <div class="image-caption">
+                        <span class="title">页面 1</span>
+                        <span class="desc">点击缩略图，在弹窗中查看完整页面</span>
+                    </div>
+                </div>
+                
+                <!-- 图片2 -->
+                <div class="image-item">
+                    <a class="image-link" data-url="https://nowater0418.github.io/2/" data-title="页面2">
+                        <img src="https://raw.githubusercontent.com/nowater0418/image/main/2.jpg" alt="图片2">
+                    </a>
+                    <div class="image-caption">
+                        <span class="title">页面 2</span>
+                        <span class="desc">点击缩略图，在弹窗中查看完整页面</span>
+                    </div>
+                </div>
+                
+                <!-- 图片3 -->
+                <div class="image-item">
+                    <a class="image-link" data-url="https://nowater0418.github.io/3/" data-title="页面3">
+                        <img src="https://raw.githubusercontent.com/nowater0418/image/main/3.jpg" alt="图片3">
+                    </a>
+                    <div class="image-caption">
+                        <span class="title">页面 3</span>
+                        <span class="desc">点击缩略图，在弹窗中查看完整页面</span>
+                    </div>
+                </div>
+                
+                <!-- 图片4 -->
+                <div class="image-item">
+                    <a class="image-link" data-url="https://nowater0418.github.io/4/" data-title="页面4">
+                        <img src="https://raw.githubusercontent.com/nowater0418/image/main/4.jpg" alt="图片4">
+                    </a>
+                    <div class="image-caption">
+                        <span class="title">页面 4</span>
+                        <span class="desc">点击缩略图，在弹窗中查看完整页面</span>
+                    </div>
+                </div>
+                
+                <!-- 图片5 -->
+                <div class="image-item">
+                    <a class="image-link" data-url="https://nowater0418.github.io/5/" data-title="页面5">
+                        <img src="https://raw.githubusercontent.com/nowater0418/image/main/5.jpg" alt="图片5">
+                    </a>
+                    <div class="image-caption">
+                        <span class="title">页面 5</span>
+                        <span class="desc">点击缩略图，在弹窗中查看完整页面</span>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
     
-    <div class="preview-container" id="previewContainer"></div>
-
-    <!-- 大图预览模态框 -->
-    <div class="modal" id="svgModal">
+    <!-- 模态窗口（核心结构和逻辑保持不变） -->
+    <div class="modal" id="imageModal">
         <div class="modal-content">
-            <svg class="modal-svg" id="modalSvg"></svg>
-            <div class="modal-caption" id="modalCaption"></div>
-            <button class="close-btn" id="closeModal">关闭</button>
+            <div class="modal-header">
+                <h3 class="modal-title" id="modalTitle">页面标题</h3>
+                <button class="close-btn" id="closeModal">&times;</button>
+            </div>
+            <iframe class="modal-body" id="modalFrame" src="" frameborder="0"></iframe>
         </div>
     </div>
 
     <script>
-        // SVG文件列表 - 替换为你的实际文件名
-        const svgFiles = [
-            "icon1.svg",
-            "icon2.svg",
-            "icon3.svg",
-            "icon4.svg",
-            "icon5.svg"
-        ];
-
-        const container = document.getElementById('previewContainer');
-        const searchBox = document.querySelector('.search-box');
-        const layoutButtons = document.querySelectorAll('.layout-btn');
-        const modal = document.getElementById('svgModal');
-        const modalSvg = document.getElementById('modalSvg');
-        const modalCaption = document.getElementById('modalCaption');
-        const closeModal = document.getElementById('closeModal');
-
-        // 初始化加载SVG
-        function loadSVGs() {
-            container.innerHTML = ''; // 清空容器
+        document.addEventListener('DOMContentLoaded', function() {
+            const modal = document.getElementById('imageModal');
+            const modalFrame = document.getElementById('modalFrame');
+            const modalTitle = document.getElementById('modalTitle');
+            const closeBtn = document.getElementById('closeModal');
+            const imageLinks = document.querySelectorAll('.image-link');
             
-            svgFiles.forEach(filename => {
-                const item = document.createElement('div');
-                item.className = 'svg-item';
-                item.dataset.filename = filename.toLowerCase();
-
-                // 文件名显示
-                const nameElement = document.createElement('div');
-                nameElement.className = 'svg-name';
-                nameElement.textContent = filename;
-                item.appendChild(nameElement);
-
-                // SVG预览
-                const svgImg = document.createElement('img');
-                svgImg.className = 'svg-preview';
-                svgImg.src = `./${filename}`;
-                svgImg.alt = `${filename} 预览`;
-                svgImg.dataset.filename = filename;
-
-                // 错误处理
-                svgImg.onerror = function() {
-                    svgImg.remove();
-                    const errorDiv = document.createElement('div');
-                    errorDiv.className = 'error-message';
-                    errorDiv.textContent = `❌ 无法加载 ${filename}`;
-                    item.appendChild(errorDiv);
-                };
-
-                item.appendChild(svgImg);
-                container.appendChild(item);
-
-                // 点击查看大图
-                item.addEventListener('click', () => {
-                    if (svgImg.complete) { // 仅当图片加载成功时
-                        modalCaption.textContent = filename;
-                        // 加载完整SVG内容到模态框（支持交互SVG）
-                        fetch(`./${filename}`)
-                            .then(response => response.text())
-                            .then(svgContent => {
-                                modalSvg.innerHTML = svgContent;
-                                modal.classList.add('active');
-                                document.body.style.overflow = 'hidden'; // 禁止背景滚动
-                            });
-                    }
+            // 为每个图片链接添加点击事件（核心逻辑不变）
+            imageLinks.forEach(link => {
+                link.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    const url = this.getAttribute('data-url');
+                    const title = this.getAttribute('data-title');
+                    
+                    modalFrame.src = url;
+                    modalTitle.textContent = title;
+                    modal.style.display = 'flex';
                 });
             });
-        }
-
-        // 搜索过滤功能
-        searchBox.addEventListener('input', (e) => {
-            const searchTerm = e.target.value.toLowerCase().trim();
-            const items = document.querySelectorAll('.svg-item');
             
-            items.forEach(item => {
-                const filename = item.dataset.filename;
-                if (filename.includes(searchTerm)) {
-                    item.style.display = '';
-                } else {
-                    item.style.display = 'none';
+            // 关闭模态窗口
+            closeBtn.addEventListener('click', function() {
+                modal.style.display = 'none';
+                modalFrame.src = '';
+            });
+            
+            // 点击模态窗口外部关闭
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    modal.style.display = 'none';
+                    modalFrame.src = '';
                 }
             });
         });
-
-        // 布局切换功能
-        layoutButtons.forEach(btn => {
-            btn.addEventListener('click', () => {
-                // 更新按钮状态
-                layoutButtons.forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                
-                // 切换布局
-                const layout = btn.dataset.layout;
-                if (layout === 'list') {
-                    container.classList.add('list-view');
-                    document.querySelectorAll('.svg-item').forEach(item => {
-                        item.classList.add('list-view');
-                    });
-                } else {
-                    container.classList.remove('list-view');
-                    document.querySelectorAll('.svg-item').forEach(item => {
-                        item.classList.remove('list-view');
-                    });
-                }
-            });
-        });
-
-        // 关闭模态框
-        closeModal.addEventListener('click', () => {
-            modal.classList.remove('active');
-            document.body.style.overflow = ''; // 恢复背景滚动
-        });
-
-        // 点击模态框外部关闭
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                modal.classList.remove('active');
-                document.body.style.overflow = '';
-            }
-        });
-
-        // 按ESC键关闭模态框
-        document.addEventListener('keydown', (e) => {
-            if (e.key === 'Escape' && modal.classList.contains('active')) {
-                modal.classList.remove('active');
-                document.body.style.overflow = '';
-            }
-        });
-
-        // 初始化页面
-        loadSVGs();
     </script>
 </body>
 </html>
